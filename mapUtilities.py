@@ -166,7 +166,7 @@ class mapManipulator(Node):
         
         image_array=self.image_array
 
-        from sklearn.neighbors import KDTree
+        from scipy.spatial import KDTree
         
         
 

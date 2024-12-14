@@ -100,12 +100,7 @@ def search(maze, start, end, scale_factor):
             a) get the current postion for the selected node (this becomes parent node for the children)
             b) check if a valid position exist (boundary will make few nodes invalid)
             c) if any node is a wall then ignore that
-            d) add to valid children node list for the selected parent
-            
-            For all the children node
-                a) if child in visited list then ignore it and try next node
-                b) calculate child node g, h and f values
-                c) if child in yet_to_visit list then ignore it
+            d) add to valid children node list for the selected parent node
                 d) else move the child to yet_to_visit list
     """
     #find maze has got how many rows and columns 
@@ -193,13 +188,21 @@ def search(maze, start, end, scale_factor):
             # Add the child to the yet_to_visit list
             yet_to_visit_dict[child.position] = child
 
+def distance(start_node, end_node):
+    """
+        Returns the euclidean distance between start and end nodes
+    """
+    # Calculate cost from start to end node using euclidean distance
+    return sqrt(((start_node.position[0] - end_node.position[0]) ** 2) + 
+                ((start_node.position[1] - end_node.position[1]) ** 2)) 
 
 # [Part 3] TODO Complete the this function so that it is adapted to search a graph provided as PRM instead of a grid maze
 # Hint: look at the original A* search above and adapt to the PRM
 def search_PRM(points, prm, start, end):
     """
         Returns a list of tuples as a path from the given start to the given end in the given maze
-        :param prm: probabilistic roadmap
+        :param points: list of sample points (tuples of coordinates)
+        :param prm: probabilistic roadmap (indexes of child points)
         :param start: starting position as cell positions (indexes of the costMap)
         :param end: goal position as cell positions (indexes of the costMap)
         :return: path as tuples from the given start to the given end
@@ -207,15 +210,76 @@ def search_PRM(points, prm, start, end):
     """
     # Create start and end node with initized values for g, h and f
     start_idx = points.index(tuple(start))
-    start_node = Node(None, start_idx)
+    start_node = Node(None, points[start_idx])
     start_node.g = start_node.h = start_node.f = 0
 
     end_idx = points.index(tuple(end))
-    end_node = Node(None, end_idx)
+    end_node = Node(None, points[end_idx])
     end_node.g = end_node.h = end_node.f = 0
 
+    # Initialise memory for A* algorithm
     path_points = []
+    # open and closed list will be lists of tuples with point index and node information
+    open_list = [(start_idx, start_node)]
+    closed_list = []    # not actually used anywhere but helpful for debugging
+    parent_node = start_node
+    parent_index = start_idx
 
-    ...
+    # Search until end is found
+    while not parent_node == end_node:
+        parent_index, parent_node = open_list[0]
+
+        # Select node with lowest total cost to be the next parent node
+        for test_index, test_node in open_list:
+            if test_node.f < parent_node.f:
+                parent_node = test_node
+                parent_index = test_index
+
+        # move the parent node (with lowest cost) to the closed list
+        closed_list.append((parent_index, parent_node))
+        open_list.pop(open_list.index((parent_index, parent_node)))
+        # print("Searching point: " + str(parent_index) + " @ " + str(parent_node.position))
+
+        if parent_node == end_node:
+            break
+
+        # add child nodes to open list
+        for child in prm[parent_index]:
+            # check if child already exists in the open list
+            if any(item[0] == child for item in open_list):
+                item_num = 0
+                # manually index the existing item in the open list
+                for num, item in enumerate(open_list):
+                    if item[0] == child:
+                        item_num = num
+                        break
+                
+                # get existing node
+                temp_index, temp_node = open_list[item_num]
+
+                # update the node if the new cost g would be less than the existing cost
+                if temp_node.g > (parent_node.g + distance(parent_node, temp_node)):
+                    temp_node.g = parent_node.g + distance(parent_node, temp_node)
+                    temp_node.h = distance(temp_node, end_node)
+                    temp_node.f = temp_node.g + temp_node.h
+                    temp_node.parent = parent_node
+                    # save updated node back to the open list
+                    open_list[temp_index] = temp_node
+            else:
+                # create new node
+                temp_node = Node(parent_node, points[parent_index])
+                temp_node.g = parent_node.g + distance(parent_node, temp_node)
+                temp_node.h = distance(temp_node, end_node)
+                temp_node.f = temp_node.g + temp_node.h
+                # add new node at end of open list
+                open_list.append((child, Node(parent_node, points[parent_index])))
+    
+    # generate path by following the parent node references starting at the final node from the PRM A* search
+    path_node = parent_node
+    while path_node is not None:
+        path_points.append(path_node.position)
+        path_node = path_node.parent
+    # Return reversed path as we need to show from start to end path
+    path_points = path_points[::-1]
     
     return path_points
